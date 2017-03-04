@@ -1,0 +1,8 @@
+[package]
+name = "sudice"
+version = "0.1.0"
+authors = ["Michael Anthony Knyszek <mknyszek@gmail.com>"]
+
+[dependencies]
+pest = "0.4"
+rand = "0.3"
