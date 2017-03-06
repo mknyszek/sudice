@@ -6,18 +6,17 @@ pub enum SudiceCode {
     Add,
     Sub,
     Mul,
-    Div
+    Div,
     Roll,
     Reroll,
     RerollLowest,
     RerollHighest,
-    Drop,
     DropLowest,
     DropHighest,
     Ceil,
     Floor,
-    BestOf,
-    WorstOf
+    BestOf(usize),
+    WorstOf(usize)
 }
 
 #[derive(Debug)]

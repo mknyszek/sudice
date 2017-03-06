@@ -1,74 +1,10 @@
-use descriptor::*;
+use descriptor::{SudiceCode, SudiceExpression};
 
 use rand::distributions::{IndependentSample, Range};
 use rand::ThreadRng;
 
-use std::ops::{Add, Sub, Mul, Div};
-
-use std::io;
-use std::io::Write;
+use std::cmp;
 use std::vec::Vec;
-
-pub fn compute_range(d: &Descriptor) -> (i64, i64) {
-    let mut min_s = Vec::with_capacity(d.code.len());
-    let mut min_tos = 0;
-    let mut max_s = Vec::with_capacity(d.code.len());
-    let mut max_tos = 0;
-    for dc in d.code.iter() {
-        match *dc {
-            SudiceCode::Num(i) => {
-                min_s.push(min_tos);
-                min_tos = i;
-                max_s.push(max_tos);
-                max_tos = i;
-            },
-            SudiceCode::Roll => {
-                let _ = min_s.pop().unwrap();
-                let max_x = max_s.pop().unwrap();
-                max_tos = max_x * max_tos;
-            },
-            SudiceCode::Add => {
-                let min_x = min_s.pop().unwrap();
-                min_tos = min_x + min_tos;
-                let max_x = max_s.pop().unwrap();
-                max_tos = max_x + max_tos;
-            },
-            SudiceCode::Sub => {
-                let min_x = min_s.pop().unwrap();
-                min_tos = min_tos - min_x;
-                let max_x = max_s.pop().unwrap();
-                max_tos = max_tos - max_x;
-            },
-            SudiceCode::Mul => {
-                let min_x = min_s.pop().unwrap();
-                min_tos = min_x * min_tos;
-                let max_x = max_s.pop().unwrap();
-                max_tos = max_x * max_tos;
-            },
-            SudiceCode::Div => {
-                let min_x = min_s.pop().unwrap();
-                min_tos = min_tos / min_x;
-                let max_x = max_s.pop().unwrap();
-                max_tos = max_tos / max_x;
-            }
-        }
-    }
-    (min_tos, max_tos)
-}
-
-pub fn compile(w: &mut Write, d: &Descriptor) {
-    writeln!(w, "#include <random>");
-    writeln!(w, "using namespace std;");
-    writeln!(w, "uint64_t min = {};", min);
-    writeln!(w, "uint64_t max = {};", max);
-    writeln!(w, "uint64_t samples = {};", samples);
-    writeln!(w, "uint64_t hist[{}];", size);
-    writeln!(w, "int main() {");
-    writeln!(w, "  std::default_random_engine gen;");
-    writeln!(w, "  std::uniform_int_distribution<int64_t> dist({},{});");
-    writeln!(w, "  return 0;");
-    writeln!(w, "}");
-}
 
 #[derive(Debug)]
 enum SudiceValue {
@@ -100,34 +36,36 @@ impl SudiceValue {
     fn collapse(self) -> i64 {
         match self {
             SudiceValue::Scalar(i) => i,
-            SudiceValue::Vector(s) => s.iter().fold(0, |acc, &x| acc + x),
+            SudiceValue::Vector(_, s) => s.iter().fold(0, |acc, &x| acc + x),
         }
     }
 
     fn add<T: HasSudiceValue>(self, value: T) -> SudiceValue {
-        SudiceValue::Scalar(self.collapse() + value.as_value.collapse())
+        SudiceValue::Scalar(self.collapse() + value.as_value().collapse())
     }
 
     fn sub<T: HasSudiceValue>(self, value: T) -> SudiceValue {
-        SudiceValue::Scalar(self.collapse() - value.as_value.collapse())
+        SudiceValue::Scalar(self.collapse() - value.as_value().collapse())
     }
 
     fn mul<T: HasSudiceValue>(self, value: T) -> SudiceValue {
-        SudiceValue::Scalar(self.collapse() * value.as_value.collapse())
+        SudiceValue::Scalar(self.collapse() * value.as_value().collapse())
     }
 
     fn div<T: HasSudiceValue>(self, value: T) -> SudiceValue {
-        SudiceValue::Scalar(self.collapse() / value.as_value.collapse())
+        SudiceValue::Scalar(self.collapse() / value.as_value().collapse())
     }
 
     fn roll<T: HasSudiceValue, S: HasSudiceValue>(num: T, size: S, r: &mut ThreadRng) -> SudiceValue {
-        let n = num.as_value();
-        let x = size.as_value();
+        let n = num.as_value().collapse();
+        let x = size.as_value().collapse();
         let btwn = Range::new(1, x+1);
-        let v = Vec::with_capacity(n);
-        for i in 0..n {
+        assert!(n > 0);
+        let mut v = Vec::with_capacity(n as usize);
+        for _ in 0..n {
             v.push(btwn.ind_sample(r));
         }
+        v.sort();
         SudiceValue::Vector(x, v)
     }
 
@@ -142,36 +80,199 @@ impl SudiceValue {
                         v[i] = btwn.ind_sample(r);
                     }
                 }
-                self
+                SudiceValue::Vector(x, v)
+            },
+        }
+    }
+
+    fn reroll_lowest<T: HasSudiceValue>(self, value: T, r: &mut ThreadRng) -> SudiceValue {
+        let v = value.as_value().collapse();
+        assert!(v >= 0);
+        let n = v as usize;
+        match self {
+            SudiceValue::Scalar(_) => panic!("Error: Cannot reroll a scalar value."),
+            SudiceValue::Vector(x, mut v) => {
+                if n > v.len() {
+                    panic!("Error: Cannot reroll {} from {} rolls.", n, v.len());
+                }
+                let btwn = Range::new(1, x+1);
+                for i in 0..n {
+                    v[i] = btwn.ind_sample(r);
+                }
+                v.sort();
+                SudiceValue::Vector(x, v)
+            },
+        }
+    }
+
+    fn reroll_highest<T: HasSudiceValue>(self, value: T, r: &mut ThreadRng) -> SudiceValue {
+        let v = value.as_value().collapse();
+        assert!(v >= 0);
+        let n = v as usize;
+        match self {
+            SudiceValue::Scalar(_) => panic!("Error: Cannot reroll a scalar value."),
+            SudiceValue::Vector(x, mut v) => {
+                if n > v.len() {
+                    panic!("Error: Cannot reroll {} from {} rolls.", n, v.len());
+                }
+                let btwn = Range::new(1, x+1);
+                for i in (v.len()-n)..v.len() {
+                    v[i] = btwn.ind_sample(r);
+                }
+                v.sort();
+                SudiceValue::Vector(x, v)
+            },
+        }
+    }
+
+    fn drop_lowest<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        let v = value.as_value().collapse();
+        assert!(v >= 0);
+        let n = v as usize;
+        match self {
+            SudiceValue::Scalar(_) => panic!("Error: Cannot drop a scalar value."),
+            SudiceValue::Vector(x, mut v) => {
+                let len = v.len();
+                if n >= len {
+                    panic!("Error: Cannot drop {} from {} rolls.", n, v.len());
+                }
+                for i in 0..(len-n) {
+                    v[i] = v[i+n];
+                }
+                v.truncate(len-n);
+                SudiceValue::Vector(x, v)
+            },
+        }
+    }
+
+    fn drop_highest<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        let v = value.as_value().collapse();
+        assert!(v >= 0);
+        let n = v as usize;
+        match self {
+            SudiceValue::Scalar(_) => panic!("Error: Cannot drop a scalar value."),
+            SudiceValue::Vector(x, mut v) => {
+                let len = v.len();
+                if n >= len {
+                    panic!("Error: Cannot drop {} from {} rolls.", n, v.len());
+                }
+                v.truncate(len-n);
+                SudiceValue::Vector(x, v)
+            },
+        }
+    }
+
+    fn ceil<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        let n = value.as_value().collapse();
+        match self {
+            SudiceValue::Scalar(s) => if s > n { SudiceValue::Scalar(n) } else { SudiceValue::Scalar(s) },
+            SudiceValue::Vector(x, mut v) => {
+                for i in 0..v.len() {
+                    if v[i] > n {
+                        v[i] = n;
+                    }
+                }
+                SudiceValue::Vector(x, v)
+            },
+        }
+    }
+
+    fn floor<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        let n = value.as_value().collapse();
+        match self {
+            SudiceValue::Scalar(s) => if s < n { SudiceValue::Scalar(n) } else { SudiceValue::Scalar(s) },
+            SudiceValue::Vector(x, mut v) => {
+                for i in 0..v.len() {
+                    if v[i] < n {
+                        v[i] = n;
+                    }
+                }
+                SudiceValue::Vector(x, v)
             },
         }
     }
 }
 
+struct Accumulator {
+    pub ptr: usize,
+    pub count: i64,
+    pub value: i64
+}
+
+impl Accumulator {
+    pub fn new(ptr: usize, count: i64, init: i64) -> Accumulator {
+        Accumulator {
+            ptr: ptr,
+            count: count,
+            value: init
+        }
+    }
+}
+
 pub fn interpret(d: &SudiceExpression, r: &mut ThreadRng) -> i64 {
+    let mut l: Vec<Accumulator> = Vec::with_capacity(d.code.len());
     let mut s = Vec::with_capacity(d.code.len());
     let mut tos = SudiceValue::Scalar(0);
-    let op2 = |f| {
-        let x = s.pop().unwrap();
-        tos = f(tos, x);
-    };
-    let rop = |f| {
-        let x = s.pop().unwrap();
-        tos = f(tos, x, r);
-    };
-    for dcp in 0..d.code.len() {
+    let mut dcp = 0;
+    macro_rules! op2 {
+        ($func:path) => {{
+            let x = s.pop().unwrap();
+            tos = $func(tos, x);
+        }}
+    }
+
+    macro_rules! rop {
+        ($func:path) => {{
+            let x = s.pop().unwrap();
+            tos = $func(tos, x, r);
+        }}
+    }
+
+    macro_rules! accum {
+        ($func:path, $offset:ident) => {{
+            let len = l.len();
+            if len > 0 && l[len-1].ptr == dcp {
+                if l[len-1].count <= 0 {
+                    let a = l.pop().unwrap();
+                    tos = SudiceValue::Scalar(a.value);
+                } else {
+                    l[len-1].value = $func(l[len-1].value, tos.collapse());
+                    tos = s.pop().unwrap();
+                    l[len-1].count -= 1;
+                    dcp -= $offset + 1;
+                }
+            } else {
+                let x = s.pop().unwrap().collapse();
+                if x > 1 {
+                    l.push(Accumulator::new(dcp, x - 1, tos.collapse()));
+                    tos = s.pop().unwrap();
+                    dcp -= $offset + 1;
+                }
+            }
+        }}
+    }
+    while dcp < d.code.len() {
         match d.code[dcp] {
             SudiceCode::Num(i) => {
                 s.push(tos);
                 tos = SudiceValue::new(i);
             },
-            SudiceCode::Add => op2(SudiceValue::add),
-            SudiceCode::Sub => op2(SudiceValue::sub),
-            SudiceCode::Mul => op2(SudiceValue::mul),
-            SudiceCode::Div => op2(SudiceValue::div),
-            SudiceCode::Roll => rop(SudiceValue::roll),
-            SudiceCode::Reroll => rop(SudiceValue::reroll),
+            SudiceCode::Add => op2!(SudiceValue::add),
+            SudiceCode::Sub => op2!(SudiceValue::sub),
+            SudiceCode::Mul => op2!(SudiceValue::mul),
+            SudiceCode::Div => op2!(SudiceValue::div),
+            SudiceCode::Roll => rop!(SudiceValue::roll),
+            SudiceCode::Reroll => rop!(SudiceValue::reroll),
+            SudiceCode::RerollLowest => rop!(SudiceValue::reroll_lowest),
+            SudiceCode::RerollHighest => rop!(SudiceValue::reroll_highest),
+            SudiceCode::DropLowest => op2!(SudiceValue::drop_lowest),
+            SudiceCode::DropHighest => op2!(SudiceValue::drop_highest),
+            SudiceCode::Ceil => op2!(SudiceValue::ceil),
+            SudiceCode::Floor => op2!(SudiceValue::floor),
+            SudiceCode::BestOf(offset) => accum!(cmp::max, offset),
+            SudiceCode::WorstOf(offset) => accum!(cmp::min, offset),
         }
+        dcp += 1;
     }
     tos.collapse()
 }

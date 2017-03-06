@@ -1,117 +1,84 @@
+#![recursion_limit = "200"]
 #[macro_use]
 extern crate pest;
 extern crate rand;
 
 mod descriptor;
+mod parser;
+mod checker;
 mod interpreter;
+mod estimator;
 
-use descriptor::*;
-use interpreter::*;
+use parser::Rdp;
 
-use std::collections::LinkedList;
-use std::collections::HashMap;
-use std::iter::FromIterator;
-use std::vec::Vec;
+use pest::prelude::StringInput;
 
-use pest::prelude::*;
+#[cfg(test)]
+mod test {
+    use parser::Rdp;
+    use checker;
+    use estimator;
+    use pest::prelude::StringInput;
 
-impl_rdp! {
-    grammar! {
-        expr = _{
-            { ["("] ~ expr ~ [")"] | num }
-            sum  = { plus  | minus }
-            prod = { times | slash }
-            dice = { roll | reroll | rerolll | rerollh | drop | dropl | droph | ceil | floor | best | worst }
+    fn check_expr(expr: &'static str, ev: f64, sd: f64, range: i64) {
+        let mut parser = Rdp::new(StringInput::new(expr));
+        assert!(parser.expr());
+        let code = parser.compile();
+        match checker::semantic_check(&code) {
+            Ok((min, max)) => {
+                let results = estimator::estimate(&code, min, max);
+                assert!(results.max - results.min + 1 == range);
+                if ev < 0.0 {
+                    assert!(results.ev >= ev * 1.02 && results.ev <= ev * 0.98);
+                } else {
+                    assert!(results.ev <= ev * 1.02 && results.ev >= ev * 0.98);
+                }
+                assert!(results.sd <= sd * 1.02 && results.sd >= sd * 0.98);
+            },
+            Err(s) => panic!("Semantic check failed: {}", s),
         }
-
-        plus    =  { ["+"] }
-        minus   =  { ["-"] }
-        times   =  { ["*"] }
-        slash   =  { ["/"] }
-        roll    =  { ["d"] }
-        reroll  =  { ["rr"] }
-        rerolll =  { ["rrl"] }
-        rerollh =  { ["rrh"] }
-        drop    =  { ["\\"] }
-        dropl   =  { ["\\l"] }
-        droph   =  { ["\\h"] }
-        ceil    =  { ["^"] }
-        floor   =  { ["_"] }
-        best    =  { ["b"] }
-        worst   =  { ["w"] }
-
-        num        = @{ ["0"] | ['1'..'9'] ~ ['0'..'9']* }
-        whitespace = _{ [" "] }
     }
 
-    process! {
-        compile(&self) -> SudiceExpression {
-            (expr: _expr()) => {
-                let mut code = Vec::from_iter(expr.into_iter());
-                code.reverse();
-                SudiceExpression {
-                    code: code,
-                }
-            }
-        }
-        _expr(&self) -> LinkedList<SudiceCode> {
-            (&num: num) => {
-                let mut dl = LinkedList::new();
-                dl.push_front(SudiceCode::Num(num.parse::<i64>().unwrap()));
-                dl
-            },
-            (_: sum, mut left: _dexpr(), sign, mut right: _dexpr()) => {
-                left.append(&mut right);
-                left.push_front(match sign.rule {
-                    Rule::plus  => SudiceCode::Add,
-                    Rule::minus => SudiceCode::Sub,
-                    _ => unreachable!()
-                });
-                left
-            },
-            (_: prod, mut left: _dexpr(), sign, mut right: _dexpr()) => {
-                left.append(&mut right);
-                left.push_front(match sign.rule {
-                    Rule::times => SudiceCode::Mul,
-                    Rule::slash => SudiceCode::Div,
-                    _ => unreachable!()
-                });
-                left
-            },
-            (_: dice, mut left: _dexpr(), cmd, mut right: _dexpr()) => {
-                left.append(&mut right);
-                left.push_front(match cmd.rule {
-                    Rule::roll    => SudiceCode::Roll,
-                    Rule::reroll  => SudiceCode::Reroll,
-                    Rule::rerolll => SudiceCode::RerollLowest,
-                    Rule::rerollh => SudiceCode::RerollHighest,
-                    Rule::drop    => SudiceCode::Drop,
-                    Rule::dropl   => SudiceCode::DropLowest,
-                    Rule::droph   => SudiceCode::DropHighest,
-                    Rule::ceil    => SudiceCode::Ceil,
-                    Rule::floor   => SudiceCode::Floor,
-                    Rule::best    => SudiceCode::BestOf,
-                    Rule::worst   => SudiceCode::WorstOf,
-                    _ => unreachable!()
-                });
-                left
-            }
-        }
+    #[test]
+    fn simple_rolls() {
+        check_expr("1d6", 3.5, 1.708, 6);
+        check_expr("3d6", 10.5, 2.958, 16);
+    }
+
+    #[test]
+    fn arithmetic() {
+        check_expr("3 + 7", 10.0, 0.0, 1);
+        check_expr("3 - 7", -4.0, 0.0, 1);
+        check_expr("3 * 7", 21.0, 0.0, 1);
+        check_expr("21 / 7", 3.0, 0.0, 1);
+    }
+
+    #[test]
+    fn rolls_with_math() {
+        check_expr("2d8 - 3", 6.0, 3.240, 15);
+        check_expr("2+4d4", 12.0, 2.236, 13);
+        //TODO: Add more here with multiplication and division
+    }
+
+    #[test]
+    fn rolls_with_drop() {
+        check_expr("3d6\\h1", 5.54, 2.215, 11);
+        check_expr("4d6\\l1", 12.24, 2.847, 16);
+    }
+
+    #[test]
+    fn rolls_with_iteration() {
+        check_expr("1d20b2", 13.82, 4.71, 20);
+        check_expr("1d20w2", 7.17, 4.71, 20);
     }
 }
 
 fn main() {
-    let mut parser = Rdp::new(StringInput::new("(2d8 - 3)_0"));
+    let mut parser = Rdp::new(StringInput::new("(1d8 + 1d6b3)b3"));
     assert!(parser.expr());
-    let mut rng = rand::thread_rng();
     let code = parser.compile();
-    let (min, max) = compute_range(&code);
-    let size = (max - min + 1) as usize;
-    let mut hist: Vec<u64> = Vec::with_capacity(size);
-    hist.resize(size, 0);
-    for _ in 0..10000 {
-        let s = interpret(&code, &mut rng);
-        hist[(s - min) as usize] += 1;
-    }
-    println!("{:?}", hist);
+    match checker::semantic_check(&code) {
+        Ok((min, max)) => println!("{}", estimator::estimate(&code, min, max)),
+        Err(s) => println!("Error: {}", s),
+    } 
 }
