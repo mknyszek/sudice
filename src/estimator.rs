@@ -6,6 +6,8 @@ use rand;
 use std::vec::Vec;
 use std::fmt;
 
+const OBS_FACTOR: usize = 2000;
+
 #[derive(Debug)]
 pub struct SudiceResults {
     pub total: usize,
@@ -27,7 +29,7 @@ impl fmt::Display for SudiceResults {
         writeln!(f, "Expected Value:\t{}", self.ev)?;
         writeln!(f, "Std. Deviation:\t{}", self.sd)?;
         writeln!(f, "##### [ DISTRIBUTION ] #####")?;
-        let ichars = (self.max as f64).log10().ceil() as usize;
+        let ichars = 1 + (self.max as f64).log10().ceil() as usize;
         let fchars = (self.total as f64).log10().ceil() as usize; 
         let mhist = *(self.hist.iter().max().unwrap()) as f64;
         for i in self.min..self.max+1 {
@@ -46,7 +48,7 @@ pub fn estimate(code: &SudiceExpression, min: i64, max: i64) -> SudiceResults {
     let mut hist: Vec<u64> = Vec::with_capacity(size);
     hist.resize(size, 0);
     let mut rng = rand::thread_rng();
-    let total = size * 2000;
+    let total = size * OBS_FACTOR;
     for _ in 0..total {
         let s = interpreter::interpret(&code, &mut rng);
         hist[(s - min) as usize] += 1;

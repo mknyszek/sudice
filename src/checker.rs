@@ -38,6 +38,15 @@ pub fn semantic_check(d: &SudiceExpression) -> Result<(i64, i64), String> {
         }}
     }
 
+    macro_rules! arith_op_inv {
+        ($func:path) => {{
+            let min_x = min_s.pop().unwrap().collapse();
+            let max_x = max_s.pop().unwrap().collapse();
+            min_tos = CheckerValue::Scalar($func(min_tos.collapse(), max_x));
+            max_tos = CheckerValue::Scalar($func(max_tos.collapse(), min_x));
+        }}
+    }
+
     macro_rules! drop_op {
         () => {{
             let min_x = min_s.pop().unwrap().collapse();
@@ -71,9 +80,9 @@ pub fn semantic_check(d: &SudiceExpression) -> Result<(i64, i64), String> {
                 max_tos = CheckerValue::Scalar(i);
             }, 
             SudiceCode::Add => arith_op!(i64::add),
-            SudiceCode::Sub => arith_op!(i64::sub),
+            SudiceCode::Sub => arith_op_inv!(i64::sub),
             SudiceCode::Mul => arith_op!(i64::mul),
-            SudiceCode::Div => arith_op!(i64::div),
+            SudiceCode::Div => arith_op_inv!(i64::div),
             SudiceCode::Roll => {
                 let _ = min_s.pop().unwrap();
                 min_tos = CheckerValue::Vector(min_tos.collapse(), 1);

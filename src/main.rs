@@ -20,6 +20,10 @@ mod test {
     use estimator;
     use pest::prelude::StringInput;
 
+    // Test helper function.
+    //
+    // Do not use any expr with an EV/SD of 0 for testing since results
+    // are based on percent error off actual EV/SD.
     fn check_expr(expr: &'static str, ev: f64, sd: f64, range: i64) {
         let mut parser = Rdp::new(StringInput::new(expr));
         assert!(parser.expr());
@@ -57,7 +61,10 @@ mod test {
     fn rolls_with_math() {
         check_expr("2d8 - 3", 6.0, 3.240, 15);
         check_expr("2+4d4", 12.0, 2.236, 13);
-        //TODO: Add more here with multiplication and division
+        check_expr("1d20-1d20+20", 20.0, 8.15, 39);
+        check_expr("10*1d2+2d6-11", 11.0, 5.55, 21);
+        check_expr("1d6*1d6", 12.25, 8.94, 36);
+        check_expr("1d6/1d6", 1.14, 1.46, 7);
     }
 
     #[test]
@@ -74,7 +81,7 @@ mod test {
 }
 
 fn main() {
-    let mut parser = Rdp::new(StringInput::new("(1d8 + 1d6b3)b3"));
+    let mut parser = Rdp::new(StringInput::new("10d20\\l5"));
     assert!(parser.expr());
     let code = parser.compile();
     match checker::semantic_check(&code) {

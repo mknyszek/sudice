@@ -20,8 +20,8 @@ impl_rdp! {
         slash   =  { ["/"] }
         roll    =  { ["d"] }
         reroll  =  { ["rr"] }
-        rerolll =  { ["rrl"] }
-        rerollh =  { ["rrh"] }
+        rerolll =  { ["rl"] }
+        rerollh =  { ["rh"] }
         dropl   =  { ["\\l"] }
         droph   =  { ["\\h"] }
         ceil    =  { ["^"] }
