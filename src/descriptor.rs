@@ -16,7 +16,9 @@ pub enum SudiceCode {
     Ceil,
     Floor,
     BestOf(usize),
-    WorstOf(usize)
+    WorstOf(usize),
+    Select(Vec<usize>),
+    Jump(usize),
 }
 
 #[derive(Debug)]

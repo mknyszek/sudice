@@ -11,7 +11,7 @@ mod estimator;
 
 use parser::Rdp;
 
-use pest::prelude::StringInput;
+use pest::prelude::*;
 
 #[cfg(test)]
 mod test {
@@ -58,10 +58,14 @@ mod test {
     }
 
     #[test]
-    fn rolls_with_math() {
+    fn rolls_with_sum() {
         check_expr("2d8 - 3", 6.0, 3.240, 15);
         check_expr("2+4d4", 12.0, 2.236, 13);
         check_expr("1d20-1d20+20", 20.0, 8.15, 39);
+    }
+
+    #[test]
+    fn rolls_with_mult() {
         check_expr("10*1d2+2d6-11", 11.0, 5.55, 21);
         check_expr("1d6*1d6", 12.25, 8.94, 36);
         check_expr("1d6/1d6", 1.14, 1.46, 7);
@@ -81,11 +85,11 @@ mod test {
 }
 
 fn main() {
-    let mut parser = Rdp::new(StringInput::new("10d20\\l5"));
+    let mut parser = Rdp::new(StringInput::new("[1d2 ? ((1d10+10)b2) (1d10w2)]"));
     assert!(parser.expr());
     let code = parser.compile();
     match checker::semantic_check(&code) {
         Ok((min, max)) => println!("{}", estimator::estimate(&code, min, max)),
         Err(s) => println!("Error: {}", s),
-    } 
+    }
 }

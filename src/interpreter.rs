@@ -271,6 +271,20 @@ pub fn interpret(d: &SudiceExpression, r: &mut ThreadRng) -> i64 {
             SudiceCode::Floor => op2!(SudiceValue::floor),
             SudiceCode::BestOf(offset) => accum!(cmp::max, offset),
             SudiceCode::WorstOf(offset) => accum!(cmp::min, offset),
+            SudiceCode::Select(ref offsets) => {
+                let t = tos.collapse();
+                let x = t - 2;
+                if x >= 0 && x < (offsets.len() as i64) {
+                    dcp += offsets[x as usize];
+                    tos = s.pop().unwrap();
+                } else if t == 1 {
+                    tos = s.pop().unwrap();
+                } else {
+                    dcp += *offsets.last().unwrap();
+                    tos = SudiceValue::Scalar(t);
+                }
+            },
+            SudiceCode::Jump(offset) => dcp += offset
         }
         dcp += 1;
     }
