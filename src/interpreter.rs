@@ -191,6 +191,38 @@ impl SudiceValue {
             },
         }
     }
+
+    fn into_bool(self) -> bool {
+        self.collapse() == 1
+    }
+
+    fn from_bool(x: bool) -> SudiceValue {
+        if x { SudiceValue::Scalar(1) } else { SudiceValue::Scalar(2) }
+    }
+
+    fn lt<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        SudiceValue::from_bool(self.collapse() < value.as_value().collapse())
+    }
+
+    fn gt<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        SudiceValue::from_bool(self.collapse() > value.as_value().collapse())
+    }
+
+    fn eq<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        SudiceValue::from_bool(self.collapse() == value.as_value().collapse())
+    }
+
+    fn ne<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        SudiceValue::from_bool(self.collapse() != value.as_value().collapse())
+    }
+
+    fn and<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        SudiceValue::from_bool(self.into_bool() && value.as_value().into_bool())
+    }
+
+    fn or<T: HasSudiceValue>(self, value: T) -> SudiceValue {
+        SudiceValue::from_bool(self.into_bool() || value.as_value().into_bool())
+    }
 }
 
 struct Accumulator {
@@ -284,7 +316,13 @@ pub fn interpret(d: &SudiceExpression, r: &mut ThreadRng) -> i64 {
                     tos = SudiceValue::Scalar(t);
                 }
             },
-            SudiceCode::Jump(offset) => dcp += offset
+            SudiceCode::Jump(offset) => dcp += offset,
+            SudiceCode::Lt => op2!(SudiceValue::lt),
+            SudiceCode::Gt => op2!(SudiceValue::gt),
+            SudiceCode::Eq => op2!(SudiceValue::eq),
+            SudiceCode::Ne => op2!(SudiceValue::ne),
+            SudiceCode::And => op2!(SudiceValue::and),
+            SudiceCode::Or => op2!(SudiceValue::or),
         }
         dcp += 1;
     }

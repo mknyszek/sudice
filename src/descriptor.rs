@@ -19,6 +19,12 @@ pub enum SudiceCode {
     WorstOf(usize),
     Select(Vec<usize>),
     Jump(usize),
+    Lt,
+    Gt,
+    Eq,
+    Ne,
+    And,
+    Or
 }
 
 #[derive(Debug)]

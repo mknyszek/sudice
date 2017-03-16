@@ -9,6 +9,8 @@ impl_rdp! {
     grammar! {
         expr = _{
             { ["("] ~ expr ~ [")"] | select | num }
+            bnry = { and | or }
+            cond = { lt | gt | eq | ne }
             sum  = { plus  | minus }
             prod = { times | slash }
             dice = { roll | reroll | rerolll | rerollh | dropl | droph | ceil | floor | best | worst }
@@ -32,6 +34,12 @@ impl_rdp! {
         qmark   =  { ["?"] }
         bleft   =  { ["["] }
         bright  =  { ["]"] }
+        lt      =  { ["<"] }
+        gt      =  { [">"] }
+        eq      =  { ["="] }
+        ne      =  { ["<>"] }
+        and     =  { ["and"] }
+        or      =  { ["or"] }
 
         num        = @{ ["0"] | ['1'..'9'] ~ ['0'..'9']* }
         whitespace = _{ [" "] | ["\n"] | ["\r"] }
@@ -51,6 +59,26 @@ impl_rdp! {
                 let mut dl = LinkedList::new();
                 dl.push_front(SudiceCode::Num(num.parse::<i64>().unwrap()));
                 dl
+            },
+            (_: bnry, mut left: _expr(), op, mut right: _expr()) => {
+                right.append(&mut left);
+                right.push_back(match op.rule {
+                    Rule::and  => SudiceCode::And,
+                    Rule::or => SudiceCode::Or,
+                    _ => unreachable!()
+                });
+                right
+            },
+            (_: cond, mut left: _expr(), sign, mut right: _expr()) => {
+                right.append(&mut left);
+                right.push_back(match sign.rule {
+                    Rule::lt => SudiceCode::Lt,
+                    Rule::gt => SudiceCode::Gt,
+                    Rule::eq => SudiceCode::Eq,
+                    Rule::ne => SudiceCode::Ne,
+                    _ => unreachable!()
+                });
+                right
             },
             (_: sum, mut left: _expr(), sign, mut right: _expr()) => {
                 right.append(&mut left);

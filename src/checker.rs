@@ -18,6 +18,14 @@ impl CheckerValue {
             CheckerValue::Vector(l, s) => l * s,
         }
     }
+
+    fn true_value() -> CheckerValue {
+        CheckerValue::Scalar(1)
+    }
+
+    fn false_value() -> CheckerValue {
+        CheckerValue::Scalar(2)
+    }
 }
 
 struct CheckerState {
@@ -62,6 +70,8 @@ pub fn semantic_check(d: &SudiceExpression) -> Result<(i64, i64), String> {
 }
 
 fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, state: &mut CheckerState) -> Result<(), String> {
+    let mut left_can_be_true = false;
+    let mut right_can_be_true = false;
     macro_rules! arith_op {
         ($func:path) => {{
             let min_x = state.min_s.pop().unwrap().collapse();
@@ -70,8 +80,15 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
             state.max_tos = CheckerValue::Scalar($func(state.max_tos.collapse(), max_x));
         }}
     }
-
     macro_rules! arith_op_inv {
+        ($func:path) => {{
+            let min_x = state.min_s.pop().unwrap().collapse();
+            let max_x = state.max_s.pop().unwrap().collapse();
+            state.min_tos = CheckerValue::Scalar($func(state.min_tos.collapse(), max_x));
+            state.max_tos = CheckerValue::Scalar($func(state.max_tos.collapse(), min_x));
+        }}
+    }
+    macro_rules! cond_op {
         ($func:path) => {{
             let min_x = state.min_s.pop().unwrap().collapse();
             let max_x = state.max_s.pop().unwrap().collapse();
@@ -117,6 +134,42 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
             };
         }}
     }
+    macro_rules! cmp_op {
+        ($e1:expr, $e2:expr) => {{
+            let left_min = state.min_s.pop().unwrap().collapse();
+            let left_max = state.max_s.pop().unwrap().collapse();
+            let right_min = state.min_tos.collapse();
+            let right_max = state.max_tos.collapse();
+            if left_max < right_min {
+                state.min_tos = $e1;
+                state.max_tos = $e1;
+            } else if right_max < left_min {
+                state.min_tos = $e2;
+                state.max_tos = $e2;
+            } else {
+                state.min_tos = CheckerValue::true_value();
+                state.max_tos = CheckerValue::false_value();
+            }
+        }}
+    }
+    macro_rules! logic_op {
+        ($e:expr) => {{
+            let left_min = state.min_s.pop().unwrap().collapse();
+            let left_max = state.max_s.pop().unwrap().collapse();
+            let right_min = state.min_tos.collapse();
+            let right_max = state.max_tos.collapse();   
+            left_can_be_true = left_min <= 1 && 1 <= left_max;
+            right_can_be_true = right_min <= 1 && 1 <= right_max;
+            if $e {
+                state.min_tos = CheckerValue::true_value();
+                state.max_tos = CheckerValue::false_value();
+            } else {
+                state.min_tos = CheckerValue::false_value();
+                state.max_tos = CheckerValue::false_value();
+            }
+        }}
+    }
+                
     let mut dcp = start;
     while dcp < d.code.len() {
         match d.code[dcp] {
@@ -171,6 +224,12 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
             } else {
                 panic!("Error: Illegal bytecode sequence: Should not reach jump!");
             },
+            SudiceCode::Lt => cmp_op!(CheckerValue::true_value(), CheckerValue::false_value()),
+            SudiceCode::Gt => cmp_op!(CheckerValue::false_value(), CheckerValue::true_value()),
+            SudiceCode::Eq => cmp_op!(CheckerValue::false_value(), CheckerValue::false_value()),
+            SudiceCode::Ne => cmp_op!(CheckerValue::true_value(), CheckerValue::true_value()),
+            SudiceCode::And => logic_op!(left_can_be_true && right_can_be_true),
+            SudiceCode::Or => logic_op!(left_can_be_true || right_can_be_true),
         }
         dcp += 1;
     }
