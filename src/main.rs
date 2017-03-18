@@ -13,6 +13,8 @@ use parser::Rdp;
 
 use pest::prelude::*;
 
+use std::io::{self, Write};
+
 #[cfg(test)]
 mod test {
     use parser::Rdp;
@@ -84,12 +86,45 @@ mod test {
     }
 }
 
-fn main() {
-    let mut parser = Rdp::new(StringInput::new("[1d2 ? ((1d10+10)b2) (1d10w2)]"));
-    assert!(parser.expr());
+fn repl() -> io::Result<bool> {
+    print!(">>> ");
+    let _ = io::stdout().flush()?;
+    let mut buffer = String::new();
+    let n = io::stdin().read_line(&mut buffer)?;
+    if buffer.trim() == "quit" || (buffer.trim() == "" && n == 0) {
+        return Ok(true);
+    }
+
+    let mut parser = Rdp::new(StringInput::new(&buffer.trim()[..]));
+    if !parser.expr() || !parser.end() {
+        let (rules, pos) = parser.expected();
+        println!("{marker:>width$}", marker = '^', width = pos + 5);
+        print!("[Error] Expected one of: ");
+        for rule in rules.iter() {
+            print!("{:?} ", rule);
+        }
+        println!();
+        return Ok(false);
+    }
+
     let code = parser.compile();
     match checker::semantic_check(&code) {
         Ok((min, max)) => println!("{}", estimator::estimate(&code, min, max)),
         Err(s) => println!("Error: {}", s),
+    }
+    Ok(false)
+}
+
+fn main() {
+    println!("Sudice [v 0.5.0]");
+    println!("-- Dice Expression Language");
+    loop {
+        match repl() {
+            Ok(quit) => if quit { return; },
+            Err(e) => {
+                println!("{}", e);
+                return
+            }
+        }
     }
 }

@@ -42,7 +42,7 @@ impl_rdp! {
         or      =  { ["or"] }
 
         num        = @{ ["0"] | ['1'..'9'] ~ ['0'..'9']* }
-        whitespace = _{ [" "] | ["\n"] | ["\r"] }
+        whitespace = _{ [" "] }
     }
 
     process! {
