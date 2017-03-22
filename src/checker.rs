@@ -197,11 +197,9 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
                 let len = offsets.len();
                 let first_min = state.min_tos.collapse();
                 let first_max = state.max_tos.collapse();
-                let (mut min, mut max) = if first_min < 1 || first_max > (len+1) as i64 {
-                    (first_min, first_max)
-                } else {
-                    (i64::MAX, i64::MIN)
-                };
+                let bound_min = if first_min < 1 { 0 } else { first_min-1 };
+                let bound_max = if first_max >= (len-2) as i64 { (len-2) as i64 } else { first_max-1 };
+                let (mut min, mut max) = (i64::MAX, i64::MIN);
                 macro_rules! recursive_check {
                     ($e:expr) => {{
                         semantic_check_with(d, dcp + $e + 1, true, state)?;
@@ -212,9 +210,16 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
                         state.pop();
                     }}
                 }
-                recursive_check!(0);
-                for i in 0..len-1 {
-                    recursive_check!(offsets[i]);
+                if bound_min == 0 {
+                    recursive_check!(0);
+                }
+                if bound_min < (len-1) as i64 && bound_max >= 0 { 
+                    for i in bound_min..bound_max {
+                        recursive_check!(offsets[i as usize]);
+                    }
+                }
+                if first_min < 1 || first_max >= (len-2) as i64 {
+                    recursive_check!(offsets[len-2]);
                 }
                 state.push(CheckerValue::Scalar(min), CheckerValue::Scalar(max));
                 dcp += offsets[len-1];

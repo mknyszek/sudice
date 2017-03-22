@@ -306,14 +306,15 @@ pub fn interpret(d: &SudiceExpression, r: &mut ThreadRng) -> i64 {
             SudiceCode::Select(ref offsets) => {
                 let t = tos.collapse();
                 let x = t - 2;
-                if x >= 0 && x < (offsets.len() as i64) {
+                let len = offsets.len();
+                if x >= 0 && x < (len-2) as i64 {
                     dcp += offsets[x as usize];
                     tos = s.pop().unwrap();
                 } else if t == 1 {
                     tos = s.pop().unwrap();
                 } else {
-                    dcp += *offsets.last().unwrap();
-                    tos = SudiceValue::Scalar(t);
+                    dcp += offsets[len-2];
+                    tos = s.pop().unwrap();
                 }
             },
             SudiceCode::Jump(offset) => dcp += offset,

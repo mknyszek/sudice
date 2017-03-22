@@ -15,7 +15,7 @@ impl_rdp! {
             prod = { times | slash }
             dice = { roll | reroll | rerolll | rerollh | dropl | droph | ceil | floor | best | worst }
         }
-        select  =  { bleft ~ expr ~ qmark ~ expr+ ~ bright }
+        select  =  { bleft ~ expr ~ qmark ~ expr+ ~ ecase ~ expr ~ bright }
 
         plus    =  { ["+"] }
         minus   =  { ["-"] }
@@ -40,6 +40,7 @@ impl_rdp! {
         ne      =  { ["<>"] }
         and     =  { ["and"] }
         or      =  { ["or"] }
+        ecase   =  { [":"] }
 
         num        = @{ ["0"] | ['1'..'9'] ~ ['0'..'9']* }
         whitespace = _{ [" "] }
@@ -129,14 +130,14 @@ impl_rdp! {
             }
         }
         _jump_seq(&self) -> (LinkedList<SudiceCode>, Vec<usize>) {
-            (_: bright) => {
-                (LinkedList::new(), Vec::new())
+            (_: ecase, mut end: _expr(), _: bright) => {
+                end.push_back(SudiceCode::Jump(0));
+                let v = vec![end.len()];
+                (end, v)
             },
             (mut head: _expr(), mut rest: _jump_seq()) => {
                 let offset = rest.0.len();
-                if offset != 0 {
-                    head.push_back(SudiceCode::Jump(offset));
-                }
+                head.push_back(SudiceCode::Jump(offset));
                 rest.1.push(head.len());
                 head.append(&mut rest.0);
                 (head, rest.1) 
