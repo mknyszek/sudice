@@ -193,6 +193,7 @@ inference, and therefore does not quite scale as well).
 I plan to eventually add a few features to get closer to the feature-parity of
 AnyDice, but I am still unsure about how I'd like to implement several things.
 
+* Better comparison support (i.e. 2 < 1d20 < 4)
 * Exploding dice support (with tunable depth)
 * Absolute values
 * Custom dice (what AnyDice calls Sequences)
