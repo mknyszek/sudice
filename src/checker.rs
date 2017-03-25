@@ -5,7 +5,7 @@ use std::i64;
 use std::ops::{Add, Sub, Mul, Div};
 use std::vec::Vec;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum CheckerValue {
     Scalar(i64),
     Vector(i64, i64),
@@ -81,14 +81,6 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
         }}
     }
     macro_rules! arith_op_inv {
-        ($func:path) => {{
-            let min_x = state.min_s.pop().unwrap().collapse();
-            let max_x = state.max_s.pop().unwrap().collapse();
-            state.min_tos = CheckerValue::Scalar($func(state.min_tos.collapse(), max_x));
-            state.max_tos = CheckerValue::Scalar($func(state.max_tos.collapse(), min_x));
-        }}
-    }
-    macro_rules! cond_op {
         ($func:path) => {{
             let min_x = state.min_s.pop().unwrap().collapse();
             let max_x = state.max_s.pop().unwrap().collapse();
@@ -221,7 +213,8 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
                 if first_min < 1 || first_max >= (len-2) as i64 {
                     recursive_check!(offsets[len-2]);
                 }
-                state.push(CheckerValue::Scalar(min), CheckerValue::Scalar(max));
+                state.min_tos = CheckerValue::Scalar(min);
+                state.max_tos = CheckerValue::Scalar(max);
                 dcp += offsets[len-1];
             },
             SudiceCode::Jump(_) => if until_jump {
