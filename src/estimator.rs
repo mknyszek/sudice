@@ -29,7 +29,7 @@ impl fmt::Display for SudiceResults {
         writeln!(f, "Expected Value:\t{}", self.ev)?;
         writeln!(f, "Std. Deviation:\t{}", self.sd)?;
         writeln!(f, "##### [ DISTRIBUTION ] #####")?;
-        let ichars = 1 + (self.max as f64).log10().ceil() as usize;
+        let ichars = 1 + ((self.max.abs() + 1) as f64).log10().ceil() as usize;
         let fchars = (self.total as f64).log10().ceil() as usize; 
         let mhist = *(self.hist.iter().max().unwrap()) as f64;
         for i in self.min..self.max+1 {

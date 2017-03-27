@@ -163,8 +163,8 @@ Such behavior is useful for encoding something like a biased coin flip. One can
 also say
 
 ```
-1d20 = 1
-1d20 <> 1
+1d20 == 1
+1d20 != 1
 ```
 
 to encode equality and inequality. Finally, two boolean operators are provided in

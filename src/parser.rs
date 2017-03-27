@@ -15,32 +15,32 @@ impl_rdp! {
             prod = { times | slash }
             dice = { roll | reroll | rerolll | rerollh | dropl | droph | ceil | floor | best | worst }
         }
-        select  =  { bleft ~ expr ~ qmark ~ expr+ ~ ecase ~ expr ~ bright }
+        select =  { selbegin ~ expr ~ qmark ~ expr+ ~ ecase ~ expr ~ selend }
 
-        plus    =  { ["+"] }
-        minus   =  { ["-"] }
-        times   =  { ["*"] }
-        slash   =  { ["/"] }
-        roll    =  { ["d"] }
-        reroll  =  { ["rr"] }
-        rerolll =  { ["rl"] }
-        rerollh =  { ["rh"] }
-        dropl   =  { ["\\l"] }
-        droph   =  { ["\\h"] }
-        ceil    =  { ["^"] }
-        floor   =  { ["_"] }
-        best    =  { ["b"] }
-        worst   =  { ["w"] }
-        qmark   =  { ["?"] }
-        bleft   =  { ["["] }
-        bright  =  { ["]"] }
-        lt      =  { ["<"] }
-        gt      =  { [">"] }
-        eq      =  { ["="] }
-        ne      =  { ["<>"] }
-        and     =  { ["and"] }
-        or      =  { ["or"] }
-        ecase   =  { [":"] }
+        plus     =  { ["+"] }
+        minus    =  { ["-"] }
+        times    =  { ["*"] }
+        slash    =  { ["/"] }
+        roll     =  { ["d"] }
+        reroll   =  { ["rr"] }
+        rerolll  =  { ["rl"] }
+        rerollh  =  { ["rh"] }
+        dropl    =  { ["\\l"] }
+        droph    =  { ["\\h"] }
+        ceil     =  { ["^"] }
+        floor    =  { ["_"] }
+        best     =  { ["b"] }
+        worst    =  { ["w"] }
+        qmark    =  { ["?"] }
+        ecase    =  { [":"] }
+        selbegin =  { ["["] }
+        selend   =  { ["]"] }
+        lt       =  { ["<"] }
+        gt       =  { [">"] }
+        eq       =  { ["=="] }
+        ne       =  { ["!="] }
+        and      =  { ["and"] }
+        or       =  { ["or"] }
 
         num        = @{ ["-"]? ~ (["0"] | ['1'..'9'] ~ ['0'..'9']*) }
         whitespace = _{ [" "] }
@@ -117,7 +117,7 @@ impl_rdp! {
                 });
                 right
             },
-            (_: select, _: bleft, mut pred: _expr(), _: qmark, mut rest: _jump_seq()) => {
+            (_: select, _: selbegin, mut pred: _expr(), _: qmark, mut rest: _jump_seq()) => {
                 let mut sum: usize = 0;
                 rest.1.reverse();
                 for i in 0..rest.1.len() {
@@ -130,7 +130,7 @@ impl_rdp! {
             }
         }
         _jump_seq(&self) -> (LinkedList<SudiceCode>, Vec<usize>) {
-            (_: ecase, mut end: _expr(), _: bright) => {
+            (_: ecase, mut end: _expr(), _: selend) => {
                 end.push_back(SudiceCode::Jump(0));
                 let v = vec![end.len()];
                 (end, v)

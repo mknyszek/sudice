@@ -171,10 +171,18 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
             SudiceCode::Mul => arith_op!(i64::mul),
             SudiceCode::Div => arith_op_inv!(i64::div),
             SudiceCode::Roll => {
-                let _ = state.min_s.pop().unwrap();
-                state.min_tos = CheckerValue::Vector(state.min_tos.collapse(), 1);
-                let max_x = state.max_s.pop().unwrap();
-                state.max_tos = CheckerValue::Vector(state.max_tos.collapse(), max_x.collapse());
+                let min_x = state.min_s.pop().unwrap().collapse();
+                let max_x = state.max_s.pop().unwrap().collapse();
+                let min_rolls = state.min_tos.collapse();
+                let max_rolls = state.max_tos.collapse();
+                if min_rolls < 0 || max_rolls < 0 {
+                    return Err("Attempted to roll negative amount of dice.".to_string());
+                }
+                if min_x <= 0 || max_x <= 0 {
+                    return Err("Attempted to roll dice size <= 0.".to_string());
+                }
+                state.min_tos = CheckerValue::Vector(min_rolls, 1);
+                state.max_tos = CheckerValue::Vector(max_rolls, max_x);
             },
             SudiceCode::Reroll => state.nop(),
             SudiceCode::RerollLowest => state.nop(),
