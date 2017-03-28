@@ -1,5 +1,6 @@
 use descriptor::{SudiceCode, SudiceExpression};
 
+use std::cmp;
 use std::cmp::PartialOrd;
 use std::i64;
 use std::ops::{Add, Sub, Mul, Div};
@@ -161,7 +162,7 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
             }
         }}
     }
-                
+
     let mut dcp = start;
     while dcp < d.code.len() {
         match d.code[dcp] {
@@ -236,6 +237,28 @@ fn semantic_check_with(d: &SudiceExpression, start: usize, until_jump: bool, sta
             SudiceCode::Ne => cmp_op!(CheckerValue::true_value(), CheckerValue::true_value()),
             SudiceCode::And => logic_op!(left_can_be_true && right_can_be_true),
             SudiceCode::Or => logic_op!(left_can_be_true || right_can_be_true),
+            SudiceCode::Abs => {
+                let min_top = state.min_tos.collapse();
+                let max_top = state.max_tos.collapse();
+                if min_top >= 0 && max_top >= 0 {
+                    state.min_tos = CheckerValue::Scalar(min_top);
+                    state.max_tos = CheckerValue::Scalar(max_top);
+                } else if min_top < 0 && max_top < 0 {
+                    state.min_tos = CheckerValue::Scalar(max_top.abs());
+                    state.max_tos = CheckerValue::Scalar(min_top.abs());
+                } else if min_top < 0 && max_top >= 0 {
+                    state.min_tos = CheckerValue::Scalar(0);
+                    state.max_tos = CheckerValue::Scalar(cmp::max(max_top, min_top.abs()));
+                } else {
+                    return Err("Internal: Inconsistent state found (min >= 0, max < 0) during check.".to_string());
+                }
+            },
+            SudiceCode::Neg => {
+                let min_top = state.min_tos.collapse();
+                let max_top = state.max_tos.collapse();
+                state.min_tos = CheckerValue::Scalar(-max_top);
+                state.max_tos = CheckerValue::Scalar(-min_top);
+            },
         }
         dcp += 1;
     }

@@ -223,6 +223,14 @@ impl SudiceValue {
     fn or<T: HasSudiceValue>(self, value: T) -> SudiceValue {
         SudiceValue::from_bool(self.into_bool() || value.as_value().into_bool())
     }
+
+    fn abs(self) -> SudiceValue {
+        SudiceValue::Scalar(self.collapse().abs())
+    }
+
+    fn neg(self) -> SudiceValue {
+        SudiceValue::Scalar(-self.collapse())
+    }
 }
 
 struct Accumulator {
@@ -324,6 +332,8 @@ pub fn interpret(d: &SudiceExpression, r: &mut ThreadRng) -> i64 {
             SudiceCode::Ne => op2!(SudiceValue::ne),
             SudiceCode::And => op2!(SudiceValue::and),
             SudiceCode::Or => op2!(SudiceValue::or),
+            SudiceCode::Abs => tos = tos.abs(),
+            SudiceCode::Neg => tos = tos.neg(),
         }
         dcp += 1;
     }

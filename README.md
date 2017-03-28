@@ -8,12 +8,12 @@ In general, I feel that it could be quite useful to game designers seeking to
 try out new probability distributions with dice that may otherwise be hard to
 reach with an exact inference tool like AnyDice.
 
-## Getting Started
+## Tutorial
 
 Compile with `cargo build --release` and then run `target/release/sudice` to 
 start a REPL for the Sudice expression language.
 
-### Tutorial
+### Arithmetic
 
 Sudice is an expression language, which basically means all programs are single
 expressions. The simplest such expression is just arithmetic, such as
@@ -27,6 +27,8 @@ expressions. The simplest such expression is just arithmetic, such as
 
 which each compute the appropriate distribution where one number occurs 100% of
 the time. Note only integers are supported, so division will always round down.
+
+### Dice Rolls
 
 Arguably the most important operator in the language is the dice roll operator.
 For example,
@@ -42,6 +44,8 @@ another operator, we can write expressions such as
 2d3 - 6
 1d2 * 10 + 1d6
 ```
+
+### Grouping Expressions & Precedence
 
 We can also group expressions using parentheses like so
 
@@ -69,6 +73,24 @@ is the same as
 ```
 (3d6)d2
 ```
+
+### Negation & Absolute Value
+
+One can also negate expressions. Negation takes least precedence, and so will
+apply to an entire expression.
+
+```
+-1d6
+-(1d20)
+```
+
+We support taking the absolute value of expressions as well.
+
+```
+|1d6 - 4|
+```
+
+### Dice Rerolling & Dropping
 
 We also support dice rerolling such as
 
@@ -113,6 +135,8 @@ there's usually a way around it. For the example above, one may simply write
 
 to express the same distribution.
 
+### Best-of & Worst-of
+
 Other neat operations in Sudice include `b` and `w` which correspond to
 "best of" and "worst of" respectively. Essentially, they'll re-run any
 expression some number of times, and pick either the best or the worst. For
@@ -132,7 +156,9 @@ expressions, so you could do something like
 
 which would run that inner expression three times and take the worst result.
 
-One final key feature of Sudice is the select expression. It is a generalization
+### Selection
+
+Another key feature of Sudice is the select expression. It is a generalization
 of a conditional statement which is useful for encoding piecewise probability
 distributions. For example
 
@@ -149,8 +175,10 @@ expression and is always required. Thus, you could write something like
 [1d3 ? 1d2 1d4 : 1d8]
 ```
 
-Note that with these semantics, one can think of "true" as being 1 and "false"
-as everything else. To support this notion, and a more natural form of
+### Boolean Operators
+
+Note that given how selection works, one can think of "true" as being 1 and
+"false" as everything else. To support this notion, and a more natural form of
 conditionals, we provide a set of conditional operators which return 1 if true 
 and 2 as false.
 
@@ -170,6 +198,11 @@ also say
 to encode equality and inequality. Finally, two boolean operators are provided in
 the form of `and` and `or` which assume the value 1 to be true, and everything
 else to be false.
+
+```
+1d20 != 1 and 1d20 != 20
+1d20 == 1 or 1d20 == 20
+```
 
 ## Implementation Details
 
@@ -195,7 +228,6 @@ AnyDice, but I am still unsure about how I'd like to implement several things.
 
 * Better comparison support (i.e. 2 < 1d20 < 4)
 * Exploding dice support (with tunable depth)
-* Absolute values
 * Custom dice (what AnyDice calls Sequences)
 
 In general, I do not plan to add full turing-completeness to this language

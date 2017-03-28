@@ -8,39 +8,41 @@ use std::iter::FromIterator;
 impl_rdp! {
     grammar! {
         expr = _{
-            { ["("] ~ expr ~ [")"] | select | num }
+            { ["("] ~ expr ~ [")"] | select | abs | neg | num }
             bnry = { and | or }
             cond = { lt | gt | eq | ne }
             sum  = { plus  | minus }
             prod = { times | slash }
             dice = { roll | reroll | rerolll | rerollh | dropl | droph | ceil | floor | best | worst }
         }
-        select =  { selbegin ~ expr ~ qmark ~ expr+ ~ ecase ~ expr ~ selend }
+        abs    = { ["|"] ~ expr ~ ["|"] }
+        neg    = { ["-"] ~ expr }
+        select = { selbegin ~ expr ~ qmark ~ expr+ ~ ecase ~ expr ~ selend }
 
-        plus     =  { ["+"] }
-        minus    =  { ["-"] }
-        times    =  { ["*"] }
-        slash    =  { ["/"] }
-        roll     =  { ["d"] }
-        reroll   =  { ["rr"] }
-        rerolll  =  { ["rl"] }
-        rerollh  =  { ["rh"] }
-        dropl    =  { ["\\l"] }
-        droph    =  { ["\\h"] }
-        ceil     =  { ["^"] }
-        floor    =  { ["_"] }
-        best     =  { ["b"] }
-        worst    =  { ["w"] }
-        qmark    =  { ["?"] }
-        ecase    =  { [":"] }
-        selbegin =  { ["["] }
-        selend   =  { ["]"] }
-        lt       =  { ["<"] }
-        gt       =  { [">"] }
-        eq       =  { ["=="] }
-        ne       =  { ["!="] }
-        and      =  { ["and"] }
-        or       =  { ["or"] }
+        plus     = { ["+"] }
+        minus    = { ["-"] }
+        times    = { ["*"] }
+        slash    = { ["/"] }
+        roll     = { ["d"] }
+        reroll   = { ["rr"] }
+        rerolll  = { ["rl"] }
+        rerollh  = { ["rh"] }
+        dropl    = { ["\\l"] }
+        droph    = { ["\\h"] }
+        ceil     = { ["^"] }
+        floor    = { ["_"] }
+        best     = { ["b"] }
+        worst    = { ["w"] }
+        qmark    = { ["?"] }
+        ecase    = { [":"] }
+        selbegin = { ["["] }
+        selend   = { ["]"] }
+        lt       = { ["<"] }
+        gt       = { [">"] }
+        eq       = { ["=="] }
+        ne       = { ["!="] }
+        and      = { ["and"] }
+        or       = { ["or"] }
 
         num        = @{ ["-"]? ~ (["0"] | ['1'..'9'] ~ ['0'..'9']*) }
         whitespace = _{ [" "] }
@@ -116,6 +118,14 @@ impl_rdp! {
                     _ => unreachable!()
                 });
                 right
+            },
+            (_: abs, mut e: _expr()) => {
+                e.push_back(SudiceCode::Abs);
+                e
+            },
+            (_: neg, mut e: _expr()) => {
+                e.push_back(SudiceCode::Neg);
+                e
             },
             (_: select, _: selbegin, mut pred: _expr(), _: qmark, mut rest: _jump_seq()) => {
                 let mut sum: usize = 0;

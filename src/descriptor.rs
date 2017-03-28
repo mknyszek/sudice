@@ -24,7 +24,9 @@ pub enum SudiceCode {
     Eq,
     Ne,
     And,
-    Or
+    Or,
+    Abs,
+    Neg
 }
 
 #[derive(Debug)]
